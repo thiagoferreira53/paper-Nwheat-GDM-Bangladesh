@@ -184,16 +184,14 @@ dt_sim$sowing <- sapply(dt_sim$TNAM, function(x) {
 dt_sim$year <- paste0(dt_sim$WYEAR, "-", substr(dt_sim$WYEAR+1,3,4))
 
 
-# calculate emergence on DAP
-dt_sim$EDAPS <- as.Date(as.character(dt_sim$EDAT, 5, 7), format = "%Y%j") - 
+# Ensure dates are converted from Julian day format to proper Date objects
+dt_sim$EDAPS <- as.Date(as.character(dt_sim$EDAT), format = "%Y%j") - 
   as.Date(as.character(dt_sim$PDAT), format = "%Y%j")
 
-# calculate anthesis on DAP
-dt_sim$ADAPS <- as.Date(as.character(dt_sim$ADAT, 5, 7), format = "%Y%j") - 
+dt_sim$ADAPS <- as.Date(as.character(dt_sim$ADAT), format = "%Y%j") - 
   as.Date(as.character(dt_sim$PDAT), format = "%Y%j")
 
-# calculate maturity on DAP
-dt_sim$MDAPS <- as.Date(as.character(dt_sim$MDAT, 5, 7), format = "%Y%j") - 
+dt_sim$MDAPS <- as.Date(as.character(dt_sim$MDAT), format = "%Y%j") - 
   as.Date(as.character(dt_sim$PDAT), format = "%Y%j")
 
 merged_df <- merge(dt_sim, mean_observed, by = c("year", "sowing", "variety"))
