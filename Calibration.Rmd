@@ -1,5 +1,5 @@
 ---
-title: "Supplementary Material- Calibration of NWheat simulation model"
+title: "Supplementary Material- Calibration and Evaluation of NWheat Simulation Model"
 author: "J. Mauricio Fernandes and Thiago Berton"
 date: "`r Sys.Date()`"
 output:
@@ -13,21 +13,19 @@ output:
 
 # Introduction
 
-This document contains the supplementary material for the manuscript titled **"Your Manuscript Title"**. It includes additional analyses, datasets, and code used to generate the results presented in the main text.
+This document contains the supplementary material for the manuscript titled **"Mitigating the Impact of Wheat Blast on Wheat Production in Bangladesh: A Study on Sowing Dates and Varietal Selection"**. It includes additional analyses, datasets, and code used to generate the results presented in the main text.
 
-This report aims to demonstrate, using R programming, all the steps of the analysis of the *Year, Sowing Date and Variety* relationship, in Dinajpur, from data preparation to presentation of the results.
+This report aims to demonstrate, using R programming, all the steps of the analysis of the *Year, Sowing Date and Variety* relationship, in Dinajpur and Rashahi from data preparation to presentation of the results.
 
 ## Packages
 
 ```{r}
 library(tidyverse)
 library(gsheet)
-library(metan)
-library(summarytools)
 library(ggplot2)
-library(ggside)
-library(tidyquant)
 library(plyr)
+library(gridExtra)
+
 ```
 
 
@@ -49,8 +47,7 @@ head(dt)
 summary(dt)
 
 # Working directory
-
-setwd("~/Dropbox/Frontiers/supplemenMaterial")
+work_dir <- getwd()
 ```
 
 ## Experiment details
@@ -81,7 +78,7 @@ kable(df, caption = "A brief description of the four varieties used in the exper
 
 ## Soil characteristics and weather data 
 
-Detailed soil characterization was conducted for each experimental location before planting. Soil excavations were dug in each site, and soil samples were taken from each layer. The collected samples were then analyzed for pH, Organic Carbon, Total Nitrogen, Phosphorus, exchangeable potassium (K), Sulfur, Calcium, Magnesium, Boro, Zinc, Iron, Manganese, Copper, Soil Moisture, Bulk Density, Hydraulic Conductivity, and Soil Texture. The Soil data tool (SBuild) present in DSSAT v. 4.8 was used to create the soil database, which was used for general simulation purposes. The data entered in this utility were the name of the country, name of the experimental site, site code, site coordinates, soil series, and classification. Measured soil characteristics taken from each profile were used to calculate the soil physical and chemical parameters needed to run the DSSAT- NWwheat model. A detailed description of the initial soil conditions in Dinajpur and Rajshahi is presented in  Supplementary Material 1. 
+Detailed soil characterization was conducted for each experimental location before planting. Soil excavations were dug in each site, and soil samples were taken from each layer. The collected samples were then analyzed for pH, Organic Carbon, Total Nitrogen, Phosphorus, exchangeable potassium (K), Sulfur, Calcium, Magnesium, Boro, Zinc, Iron, Manganese, Copper, Soil Moisture, Bulk Density, Hydraulic Conductivity, and Soil Texture. The Soil data tool (SBuild) present in DSSAT v. 4.8 was used to create the soil database, which was used for general simulation purposes. The data entered in this utility were the name of the country, name of the experimental site, site code, site coordinates, soil series, and classification. Measured soil characteristics taken from each profile were used to calculate the soil physical and chemical parameters needed to run the DSSAT- NWwheat model. 
 
 The observed weather variables used in this study include air temperature (C), relative humidity (%), and precipitation (mm) registered every 15 minutes. These weather variables were acquired from the Bangladesh Meteorological Department (BMD) and uploaded to a database. Solar radiation was retrieved from ERA5, a global atmospheric reanalysis dataset produced by the European Centre for Medium-Range Weather Forecasts (ECMWF). 
 
@@ -125,59 +122,14 @@ In equations above  Pi and Oi are the ith the model predictions and the pairwise
 
 Here we create a plot using the `metan` package to observe the distribution of some selected variables from the five years dataset. Exploratory data analysis is a critical process for performing initial investigations to find important relationships in the data, cleaning the data, spotting anomalies, and checking assumptions through data visualization. For consistency, we maintained only the varieties that were present in all years.
 
-## Methods
-Statistical Analysis
-The following code illustrates the statistical analyses performed in this study.
-```{r}
-
-head(dt)
-dt$sowing = as_factor(dt$sowing)
-dt$year<-as_factor(dt$year)
-dt$Location<-as_factor(dt$Location)
-dt$variety<-as_factor(dt$variety)
-dt$REP<-as_factor(dt$REP)
-
-
-
-print(freq(dt$Location), method = 'render')
-print(freq(dt$variety), method = 'render')
-print(freq(dt$year), method = 'render')
-
-
-
-ggplot(dt, aes(x = sowing, y = GYAM, color = variety)) +
-  geom_point() +
-  geom_smooth(aes(color = NULL)) +
-  geom_xsideboxplot(
-    alpha    = 0.5,
-    size     = 1
-  ) +
-  scale_color_tq() +
-  scale_fill_tq() +
-  theme_tq() +
-  facet_grid(cols = vars(Location), scales = "free_x") +
-  labs(
-    title = "Grain yield by location and sowing dates across all years"
-  ) +
-  theme(
-    ggside.panel.scale.x = 0.4
-  )
-
-find_outliers(dt, HIAM, plots = TRUE) # 	Harvest index at maturity
-find_outliers(dt, CWAA, plots = TRUE) # 	Tops dry weight at anthesis
-find_outliers(dt, GYAM, plots = TRUE) # 	Grain yield at maturity
-
-
-
-```
-
 
 ## Visualization
 
 
-```{r}
+```{r yield-plot1, fig.cap="**Figure 2.** Mean wheat yield (kg ha⁻¹) for different sowing dates across years and varieties in Dinajpur, Bangladesh. The bars represent the mean yield, while the error bars indicate the standard deviation of the mean. The figure highlights the effect of sowing date and variety on yield performance over multiple growing seasons."}
+
 # Filter the data based on the conditions. 
-# Wheat blast was present in the area of the Experimental Station
+
 dt_l<-filter(dt, Location=="Dinajpur") 
 dt_v<-filter(dt_l,variety== "BARI GOM 26" | variety== "BARI GOM 30" 
                                   | variety== "BARI GOM 32" |variety== "BARI GOM 33" )
@@ -202,17 +154,144 @@ ggplot(yield, aes(x=sowing, y=mean)) +
   theme_bw() 
 ggsave("yieldDinajpur.png", width = 20, height = 20, units = "cm")
 
+```
+
+```{r plots_calibration_evaluation}
+
+## Load simulation outputs utilizing the NWheat model within the DSSAT-CSM
+dt_sim <- read.csv(file=paste0(work_dir,"/data/DSSAT_simulation_summary.csv"), header = T)
+
+#get the mean accross data observations for calibration
+mean_observed <- ddply(dt_y, c("year", "variety", "sowing"), summarise,
+                      N    = length(REP),
+                      EDAPM = mean(EDAP), #mean emergence
+                      ADAPM = mean(ADAP), #mean anthesis
+                      MDAPM = mean(MDAP), #mean maturity
+                      CWAMM = mean(CWAM), #mean canopy weight
+                      HIAMM = mean(HIAM), #mean grain number
+                      HWAMM = mean(GYAM)) #mean yield 
+
+dt_sim$variety <- sapply(dt_sim$TNAM, function(x) {
+  parts <- strsplit(x, "_")[[1]]
+  extracted <- parts[2:4]
+  toupper(paste(extracted, collapse = " "))
+})
+
+dt_sim$sowing <- sapply(dt_sim$TNAM, function(x) {
+  strsplit(x, "_")[[1]][6]
+})
+
+dt_sim$year <- paste0(dt_sim$WYEAR, "-", substr(dt_sim$WYEAR+1,3,4))
+
+
+# calculate emergence on DAP
+dt_sim$EDAPS <- as.Date(as.character(dt_sim$EDAT, 5, 7), format = "%Y%j") - 
+  as.Date(as.character(dt_sim$PDAT), format = "%Y%j")
+
+# calculate anthesis on DAP
+dt_sim$ADAPS <- as.Date(as.character(dt_sim$ADAT, 5, 7), format = "%Y%j") - 
+  as.Date(as.character(dt_sim$PDAT), format = "%Y%j")
+
+# calculate maturity on DAP
+dt_sim$MDAPS <- as.Date(as.character(dt_sim$MDAT, 5, 7), format = "%Y%j") - 
+  as.Date(as.character(dt_sim$PDAT), format = "%Y%j")
+
+merged_df <- merge(dt_sim, mean_observed, by = c("year", "sowing", "variety"))
+
+
+#1:1 plot for yield
+c1<-ggplot(merged_df, aes(x=HWAMM, y= HWAM, color=sowing, 
+                          label = TNAM))+  
+  geom_point() +
+  geom_abline(intercept=0, slope=1) +
+  labs(x='Observed Yield', y='Simulated Yield')+
+  facet_wrap(~variety)+
+  xlim(800,7000)+
+  ylim(800,7000)
+c1
+
+#1:1 plot for anthesis
+c2<-ggplot(merged_df, aes(x=ADAPM, y= ADAPS, color=sowing, 
+                          label = TNAM))+  
+  geom_point() +
+  geom_abline() +
+  labs(x='Observed anthesis date', y='Simulated anthesis date')+
+  facet_wrap(~variety)+
+  xlim(40,120)+
+  ylim(40,120)
+c2
+
+#1:1 plot for maturity
+c3<-ggplot(merged_df, aes(x=MDAPM, y= MDAPS, color=sowing, 
+                          label = TNAM))+  
+  geom_point() +
+  geom_abline() +
+  labs(x='Observed maturity date', y='Simulated maturity date')+
+  facet_wrap(~variety)+
+  xlim(80,170)+
+  ylim(80,170)
+c3
+
+#1:1 plot for grain number
+c4<-ggplot(merged_df, aes(x=HIAMM, y= HIAM*100, color=sowing, 
+                          label = TNAM))+  
+  geom_point() +
+  geom_abline() +
+  labs(x='Observed grain number', y='Simulated grain number')+
+  facet_wrap(~variety)+
+  xlim(20,60)+
+  ylim(20,60)
+c4
+
+#1:1 plot for biomass
+c5<-ggplot(merged_df, aes(x=CWAMM, y= CWAM, color=sowing, 
+                          label = TNAM))+  
+  geom_point() +
+  geom_abline(intercept=0, slope=1) +
+  labs(x='Observed Top Biomass', y='Simulated Top Biomass')+
+  facet_wrap(~variety)+
+  xlim(6000,15000)+
+  ylim(6000,15000)
+c5
+
+#grid.arrange(c1,c2,c3,c4,c5, nrow=5, ncol=1)
+
+```
+
+```{r yield-plot2, fig.cap="**Figure 2.** Mean wheat yield (kg ha⁻¹) for different sowing dates across years and varieties in Rajshahi, Bangladesh. The bars represent the mean yield, while the error bars indicate the standard deviation of the mean. The figure highlights the effect of sowing date and variety on yield performance over multiple growing seasons."}
+
+# Create the plot}
+# Filter the data based on the conditions. 
+
+dt_l<-filter(dt, Location=="Rajshahi") 
+dt_v<-filter(dt_l,variety== "BARI GOM 26" | variety== "BARI GOM 30" 
+                                  | variety== "BARI GOM 32" |variety== "BARI GOM 33" )
+dt_y<-filter(dt_v,year=="2017-18"|year=="2018-19"|year=="2019-20"|year=="2020-21")
+  
+
+# Yield
+# Calculate the mean standard error for each combination of factors
+yield <- ddply(dt_y, c("year", "variety", "sowing"), summarise,
+                 N    = length(REP),
+                 mean = mean(GYAM),
+                 sd   = sd(GYAM),
+                 se   = sd / sqrt(N))
+
+ggplot(yield, aes(x=sowing, y=mean)) + 
+  geom_bar(stat="identity",color="blue", fill="white") +
+  geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=.5,
+                position=position_dodge(.9),color="red") +
+  ylab(expression("Yield Kg ha"^-1)) +
+  xlab("Sowing Date")+
+  facet_wrap(~year+variety)+
+  theme_bw() 
+ggsave("yieldRajshahir.png", width = 20, height = 20, units = "cm")
+
 
 ```
 
 ## Results
 Summary of Results
-Provide a brief summary of the key results.
+The trials data revealed that delayed sowing, from November 25 to January 4 in 10-day intervals, led to a marked decline in yields across Dinajpur and Rajshahi in all seasons. 
 
-
-
-## Conclusions
-```{r}
-
-```
 
