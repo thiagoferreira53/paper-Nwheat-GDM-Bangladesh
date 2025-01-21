@@ -156,7 +156,7 @@ ggsave("yieldDinajpur.png", width = 20, height = 20, units = "cm")
 
 ```
 
-```{r plots_calibration_evaluation}
+```{r merging observed and simulated data}
 
 ## Load simulation outputs utilizing the NWheat model within the DSSAT-CSM
 dt_sim <- read.csv(file=paste0(work_dir,"/data/DSSAT_simulation_summary.csv"), header = T)
@@ -196,63 +196,103 @@ dt_sim$MDAPS <- as.Date(as.character(dt_sim$MDAT), format = "%Y%j") -
 
 merged_df <- merge(dt_sim, mean_observed, by = c("year", "sowing", "variety"))
 
+```
 
-#1:1 plot for yield
-c1<-ggplot(merged_df, aes(x=HWAMM, y= HWAM, color=sowing, 
-                          label = TNAM))+  
+
+
+```{r Functions to calculate metrics}
+
+calculate_metrics <- function(observed, simulated) {
+  
+  observed <- as.numeric(observed)
+  simulated <- as.numeric(simulated)
+  
+  rmse <- sqrt(mean((simulated - observed)^2))
+  d_stat <- 1 - (sum((simulated - observed)^2) / sum((abs(simulated - mean(observed)) + abs(observed - mean(observed)))^2))
+  nse <- 1 - (sum((simulated - observed)^2) / sum((observed - mean(observed))^2))
+  return(c(RMSE = rmse, D_Stat = d_stat, NSE = nse))
+}
+
+metrics <- list(
+  Yield = calculate_metrics(merged_df$HWAMM, merged_df$HWAM),
+  Anthesis = calculate_metrics(merged_df$ADAPM, merged_df$ADAPS),
+  Maturity = calculate_metrics(merged_df$MDAPM, merged_df$MDAPS),
+  Grain_Number = calculate_metrics(merged_df$HIAMM, merged_df$HIAM * 100),
+  Biomass = calculate_metrics(merged_df$CWAMM, merged_df$CWAM)
+)
+
+format_metrics <- function(metrics) {
+  sprintf("RMSE: %.2f\nD-stat: %.2f\nNSE: %.2f", metrics["RMSE"], metrics["D_Stat"], metrics["NSE"])
+}
+
+yield_metrics <- format_metrics(metrics$Yield)
+anthesis_metrics <- format_metrics(metrics$Anthesis)
+maturity_metrics <- format_metrics(metrics$Maturity)
+grain_number_metrics <- format_metrics(metrics$Grain_Number)
+biomass_metrics <- format_metrics(metrics$Biomass)
+
+```
+
+
+
+
+```{r plots_calibration_evaluation}
+
+# 1:1 plot for yield
+c1 <- ggplot(merged_df, aes(x = HWAMM, y = HWAM, color = sowing, label = TNAM)) +  
   geom_point() +
-  geom_abline(intercept=0, slope=1) +
-  labs(x='Observed Yield', y='Simulated Yield')+
-  facet_wrap(~variety)+
-  xlim(800,7000)+
-  ylim(800,7000)
+  geom_abline(intercept = 0, slope = 1) +
+  labs(x = 'Observed Yield', y = 'Simulated Yield') +
+  facet_wrap(~variety) +
+  xlim(800, 7000) +
+  ylim(800, 7000) +
+  annotate("text", x = 1000, y = 6150, label = yield_metrics, hjust = 0)
 c1
 
-#1:1 plot for anthesis
-c2<-ggplot(merged_df, aes(x=ADAPM, y= ADAPS, color=sowing, 
-                          label = TNAM))+  
+# 1:1 plot for anthesis
+c2 <- ggplot(merged_df, aes(x = ADAPM, y = ADAPS, color = sowing, label = TNAM)) +  
   geom_point() +
   geom_abline() +
-  labs(x='Observed anthesis date', y='Simulated anthesis date')+
-  facet_wrap(~variety)+
-  xlim(40,120)+
-  ylim(40,120)
+  labs(x = 'Observed Anthesis Date', y = 'Simulated Anthesis Date') +
+  facet_wrap(~variety) +
+  xlim(40, 120) +
+  ylim(40, 120) +
+  annotate("text", x = 50, y = 105, label = anthesis_metrics, hjust = 0)
 c2
 
-#1:1 plot for maturity
-c3<-ggplot(merged_df, aes(x=MDAPM, y= MDAPS, color=sowing, 
-                          label = TNAM))+  
+# 1:1 plot for maturity
+c3 <- ggplot(merged_df, aes(x = MDAPM, y = MDAPS, color = sowing, label = TNAM)) +  
   geom_point() +
   geom_abline() +
-  labs(x='Observed maturity date', y='Simulated maturity date')+
-  facet_wrap(~variety)+
-  xlim(80,170)+
-  ylim(80,170)
+  labs(x = 'Observed Maturity Date', y = 'Simulated Maturity Date') +
+  facet_wrap(~variety) +
+  xlim(80, 170) +
+  ylim(80, 170) +
+  annotate("text", x = 90, y = 155, label = maturity_metrics, hjust = 0)
 c3
 
-#1:1 plot for grain number
-c4<-ggplot(merged_df, aes(x=HIAMM, y= HIAM*100, color=sowing, 
-                          label = TNAM))+  
+# 1:1 plot for grain number
+c4 <- ggplot(merged_df, aes(x = HIAMM, y = HIAM * 100, color = sowing, label = TNAM)) +  
   geom_point() +
   geom_abline() +
-  labs(x='Observed grain number', y='Simulated grain number')+
-  facet_wrap(~variety)+
-  xlim(20,60)+
-  ylim(20,60)
+  labs(x = 'Observed Grain Number', y = 'Simulated Grain Number') +
+  facet_wrap(~variety) +
+  xlim(20, 60) +
+  ylim(20, 60) +
+  annotate("text", x = 25, y = 53, label = grain_number_metrics, hjust = 0)
 c4
 
-#1:1 plot for biomass
-c5<-ggplot(merged_df, aes(x=CWAMM, y= CWAM, color=sowing, 
-                          label = TNAM))+  
+# 1:1 plot for biomass
+c5 <- ggplot(merged_df, aes(x = CWAMM, y = CWAM, color = sowing, label = TNAM)) +  
   geom_point() +
-  geom_abline(intercept=0, slope=1) +
-  labs(x='Observed Top Biomass', y='Simulated Top Biomass')+
-  facet_wrap(~variety)+
-  xlim(6000,15000)+
-  ylim(6000,15000)
+  geom_abline(intercept = 0, slope = 1) +
+  labs(x = 'Observed Top Biomass', y = 'Simulated Top Biomass') +
+  facet_wrap(~variety) +
+  xlim(6000, 15000) +
+  ylim(6000, 15000) +
+  annotate("text", x = 6500, y = 13500, label = biomass_metrics, hjust = 0)
 c5
 
-#grid.arrange(c1,c2,c3,c4,c5, nrow=5, ncol=1)
 
 ```
 
@@ -291,5 +331,16 @@ ggsave("yieldRajshahir.png", width = 20, height = 20, units = "cm")
 ## Results
 Summary of Results
 The trials data revealed that delayed sowing, from November 25 to January 4 in 10-day intervals, led to a marked decline in yields across Dinajpur and Rajshahi in all seasons. 
+
+
+
+
+## References
+
+Willmott, C. J., Robeson, S. M., & Matsuura, K. (2012). A refined index of model performance. International Journal of Climatology, 32(13), 2088–2094. https://doi.org/10.1002/joc.2419 
+Yang, J. M., Yang, J. Y., Liu, S., & Hoogenboom, G. (2014). An evaluation of the statistical methods for testing the performance of crop models with observed data. Agricultural Systems, 127, 81–89. https://doi.org/10.1016/j.agsy.2014.01.008 
+
+Choudhury, A. K., Hena, M. A.,  , S., Choudhury, A. K., Ishtiaque, S., Sen, R., Jahan, M. A. H. S., Akhter, S., Ahmed, F., Biswas, J. C., Manirruzaman, M., Hossain, M. B., Miah, M. M., Rahman, M. M., Zahan, T., Khan, A. S. M. M. R., & Kalra, N. (2018). Calibration and Validation of DSSAT Model for Simulating Wheat Yield in Bangladesh Haya: The Saudi Journal of Life Sciences (SJLS) Calibration and Validation of DSSAT Model for Simulating Wheat Yield in Bangladesh. https://doi.org/10.21276/haya.2018.3.4.3 
+
 
 
