@@ -168,7 +168,7 @@ mean_observed <- ddply(dt_y, c("year", "variety", "sowing"), summarise,
                       ADAPM = mean(ADAP), #mean anthesis
                       MDAPM = mean(MDAP), #mean maturity
                       CWAMM = mean(CWAM), #mean canopy weight
-                      HIAMM = mean(HIAM), #mean grain number
+                      HIAMM = mean(HIAM), #mean harvest index
                       HWAMM = mean(GYAM)) #mean yield 
 
 dt_sim$variety <- sapply(dt_sim$TNAM, function(x) {
@@ -185,16 +185,18 @@ dt_sim$year <- paste0(dt_sim$WYEAR, "-", substr(dt_sim$WYEAR+1,3,4))
 
 
 # Ensure dates are converted from Julian day format to proper Date objects
-dt_sim$EDAPS <- as.Date(as.character(dt_sim$EDAT), format = "%Y%j") - 
-  as.Date(as.character(dt_sim$PDAT), format = "%Y%j")
+dt_sim$EDAPS <- as.numeric(as.Date(as.character(dt_sim$EDAT), format = "%Y%j") - 
+  as.Date(as.character(dt_sim$PDAT), format = "%Y%j"))
 
-dt_sim$ADAPS <- as.Date(as.character(dt_sim$ADAT), format = "%Y%j") - 
-  as.Date(as.character(dt_sim$PDAT), format = "%Y%j")
+dt_sim$ADAPS <- as.numeric(as.Date(as.character(dt_sim$ADAT), format = "%Y%j") - 
+  as.Date(as.character(dt_sim$PDAT), format = "%Y%j"))
 
-dt_sim$MDAPS <- as.Date(as.character(dt_sim$MDAT), format = "%Y%j") - 
-  as.Date(as.character(dt_sim$PDAT), format = "%Y%j")
+dt_sim$MDAPS <- as.numeric(as.Date(as.character(dt_sim$MDAT), format = "%Y%j") - 
+  as.Date(as.character(dt_sim$PDAT), format = "%Y%j"))
 
 merged_df <- merge(dt_sim, mean_observed, by = c("year", "sowing", "variety"))
+
+merged_df$HIAM <- merged_df$HIAM * 100
 
 ```
 
@@ -202,95 +204,113 @@ merged_df <- merge(dt_sim, mean_observed, by = c("year", "sowing", "variety"))
 
 ```{r Functions to calculate metrics}
 
+# Function to calculate RMSE, D-stat, and NSE
 calculate_metrics <- function(observed, simulated) {
-  
   observed <- as.numeric(observed)
   simulated <- as.numeric(simulated)
   
-  rmse <- sqrt(mean((simulated - observed)^2))
-  d_stat <- 1 - (sum((simulated - observed)^2) / sum((abs(simulated - mean(observed)) + abs(observed - mean(observed)))^2))
-  nse <- 1 - (sum((simulated - observed)^2) / sum((observed - mean(observed))^2))
-  return(c(RMSE = rmse, D_Stat = d_stat, NSE = nse))
+  rmse <- sqrt(mean((simulated - observed)^2, na.rm = TRUE))
+  d_stat <- 1 - (sum((simulated - observed)^2, na.rm = TRUE) /
+                 sum((abs(simulated - mean(observed, na.rm = TRUE)) + 
+                      abs(observed - mean(observed, na.rm = TRUE)))^2, na.rm = TRUE))
+  nse <- 1 - (sum((simulated - observed)^2, na.rm = TRUE) /
+              sum((observed - mean(observed, na.rm = TRUE))^2, na.rm = TRUE))
+  return(data.frame(RMSE = rmse, D_Stat = d_stat, NSE = nse))
 }
 
-metrics <- list(
-  Yield = calculate_metrics(merged_df$HWAMM, merged_df$HWAM),
-  Anthesis = calculate_metrics(merged_df$ADAPM, merged_df$ADAPS),
-  Maturity = calculate_metrics(merged_df$MDAPM, merged_df$MDAPS),
-  Grain_Number = calculate_metrics(merged_df$HIAMM, merged_df$HIAM * 100),
-  Biomass = calculate_metrics(merged_df$CWAMM, merged_df$CWAM)
-)
-
-format_metrics <- function(metrics) {
-  sprintf("RMSE: %.2f\nD-stat: %.2f\nNSE: %.2f", metrics["RMSE"], metrics["D_Stat"], metrics["NSE"])
+# Calculate metrics by variety for any variable
+calculate_metrics_by_variety <- function(data, observed_col, simulated_col, variety_name) {
+  data %>%
+    filter(variety == variety_name) %>%
+    summarise(
+      RMSE = sqrt(mean((get(simulated_col) - get(observed_col))^2, na.rm = TRUE)),
+      D_Stat = 1 - (sum((get(simulated_col) - get(observed_col))^2, na.rm = TRUE) / 
+                    sum((abs(get(simulated_col) - mean(get(observed_col), na.rm = TRUE)) + 
+                         abs(get(observed_col) - mean(get(observed_col), na.rm = TRUE)))^2, na.rm = TRUE)),
+      NSE = 1 - (sum((get(simulated_col) - get(observed_col))^2, na.rm = TRUE) / 
+                 sum((get(observed_col) - mean(get(observed_col), na.rm = TRUE))^2, na.rm = TRUE))
+    ) %>%
+    mutate(Metrics = sprintf("RMSE: %.2f\nD-stat: %.2f\nNSE: %.2f", RMSE, D_Stat, NSE))
 }
 
-yield_metrics <- format_metrics(metrics$Yield)
-anthesis_metrics <- format_metrics(metrics$Anthesis)
-maturity_metrics <- format_metrics(metrics$Maturity)
-grain_number_metrics <- format_metrics(metrics$Grain_Number)
-biomass_metrics <- format_metrics(metrics$Biomass)
+# Merge calculated metrics with the main dataset for plotting
+add_metrics_to_data <- function(variety, data, observed_col, simulated_col) {
+  # Calculate metrics
+  metrics <- calculate_metrics_by_variety(data, observed_col, simulated_col, variety)
+  
+  metrics['variety'] <- variety
+  return(metrics)
+  
+  # Add metrics back to the original data by joining on variety
+  #data <- data %>%
+  #  left_join(metrics, by = "variety")
+  
+  #return(data)
+}
+
+varieties <- unique(merged_df$variety) # do loop here
+
+yield_metrics <- lapply(X = varieties, FUN = add_metrics_to_data, data = merged_df, observed_col = "HWAMM", simulated_col = "HWAM")
+yield_metrics <- bind_rows(yield_metrics)
+
+anthesis_metrics <- lapply(X = varieties, FUN = add_metrics_to_data, data = merged_df, observed_col = "ADAPM", simulated_col = "ADAPS")
+anthesis_metrics <- bind_rows(anthesis_metrics)
+
+maturity_metrics <- lapply(X = varieties, FUN = add_metrics_to_data, data = merged_df, observed_col = "MDAPM", simulated_col = "MDAPS")
+maturity_metrics <- bind_rows(maturity_metrics)
+
+harvest_index_metrics <- lapply(X = varieties, FUN = add_metrics_to_data, data = merged_df, observed_col = "HIAMM", simulated_col = "HIAM")
+harvest_index_metrics <- bind_rows(harvest_index_metrics)
+
+biomass_metrics <- lapply(X = varieties, FUN = add_metrics_to_data, data = merged_df, observed_col = "CWAMM", simulated_col = "CWAM")
+biomass_metrics <- bind_rows(biomass_metrics)
 
 ```
 
 
-
-
 ```{r plots_calibration_evaluation}
 
-# 1:1 plot for yield
-c1 <- ggplot(merged_df, aes(x = HWAMM, y = HWAM, color = sowing, label = TNAM)) +  
-  geom_point() +
-  geom_abline(intercept = 0, slope = 1) +
-  labs(x = 'Observed Yield', y = 'Simulated Yield') +
-  facet_wrap(~variety) +
-  xlim(800, 7000) +
-  ylim(800, 7000) +
-  annotate("text", x = 1000, y = 6150, label = yield_metrics, hjust = 0)
+# Plot with metrics for each variable
+plot_with_metrics <- function(data, x_col, y_col, x_label, y_label, x_limits, y_limits, metrics) {
+  ggplot(data, aes_string(x = x_col, y = y_col, color = "sowing", label = "TNAM")) +
+    geom_point() +
+    geom_abline(intercept = 0, slope = 1) +
+    labs(x = x_label, y = y_label) +
+    facet_wrap(~variety) +
+    xlim(x_limits) +
+    ylim(y_limits) +
+    geom_text(data = metrics %>% group_by(variety) %>% slice(1), 
+              aes(x = x_limits[1] + 0.10 * diff(x_limits), 
+                  y = y_limits[2] - 0.15 * diff(y_limits), 
+                  label = Metrics), 
+              inherit.aes = FALSE, hjust = 0, color = "black")
+}
+
+# Yield plot
+c1 <- plot_with_metrics(merged_df, "HWAMM", "HWAM", 
+                        "Observed Yield", "Simulated Yield", c(800, 7000), c(800, 7000), yield_metrics)
+
+# Anthesis plot
+c2 <- plot_with_metrics(merged_df, "ADAPM", "ADAPS", 
+                        "Observed Anthesis Date", "Simulated Anthesis Date", c(40, 120), c(40, 120), anthesis_metrics)
+
+# Maturity plot
+c3 <- plot_with_metrics(merged_df, "MDAPM", "MDAPS", 
+                        "Observed Maturity Date", "Simulated Maturity Date", c(80, 170), c(80, 170), maturity_metrics)
+
+# Harvest index plot
+c4 <- plot_with_metrics(merged_df, "HIAMM", "HIAM", 
+                        "Observed Grain Number", "Simulated Grain Number", c(0, 100), c(0, 100), harvest_index_metrics)
+
+# Biomass plot
+c5 <- plot_with_metrics(merged_df, "CWAMM", "CWAM", 
+                        "Observed Top Biomass", "Simulated Top Biomass", c(6000, 15000), c(6000, 15000), biomass_metrics)
+
+# Display plots
 c1
-
-# 1:1 plot for anthesis
-c2 <- ggplot(merged_df, aes(x = ADAPM, y = ADAPS, color = sowing, label = TNAM)) +  
-  geom_point() +
-  geom_abline() +
-  labs(x = 'Observed Anthesis Date', y = 'Simulated Anthesis Date') +
-  facet_wrap(~variety) +
-  xlim(40, 120) +
-  ylim(40, 120) +
-  annotate("text", x = 50, y = 105, label = anthesis_metrics, hjust = 0)
 c2
-
-# 1:1 plot for maturity
-c3 <- ggplot(merged_df, aes(x = MDAPM, y = MDAPS, color = sowing, label = TNAM)) +  
-  geom_point() +
-  geom_abline() +
-  labs(x = 'Observed Maturity Date', y = 'Simulated Maturity Date') +
-  facet_wrap(~variety) +
-  xlim(80, 170) +
-  ylim(80, 170) +
-  annotate("text", x = 90, y = 155, label = maturity_metrics, hjust = 0)
 c3
-
-# 1:1 plot for grain number
-c4 <- ggplot(merged_df, aes(x = HIAMM, y = HIAM * 100, color = sowing, label = TNAM)) +  
-  geom_point() +
-  geom_abline() +
-  labs(x = 'Observed Grain Number', y = 'Simulated Grain Number') +
-  facet_wrap(~variety) +
-  xlim(20, 60) +
-  ylim(20, 60) +
-  annotate("text", x = 25, y = 53, label = grain_number_metrics, hjust = 0)
 c4
-
-# 1:1 plot for biomass
-c5 <- ggplot(merged_df, aes(x = CWAMM, y = CWAM, color = sowing, label = TNAM)) +  
-  geom_point() +
-  geom_abline(intercept = 0, slope = 1) +
-  labs(x = 'Observed Top Biomass', y = 'Simulated Top Biomass') +
-  facet_wrap(~variety) +
-  xlim(6000, 15000) +
-  ylim(6000, 15000) +
-  annotate("text", x = 6500, y = 13500, label = biomass_metrics, hjust = 0)
 c5
 
 
