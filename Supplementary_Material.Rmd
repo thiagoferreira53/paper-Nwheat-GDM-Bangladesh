@@ -2,12 +2,12 @@
 title: "Supplementary Material 1- Calibration and Evaluation of NWheat Simulation Model"
 date: "`r Sys.Date()`"
 output:
-  pdf_document: default
   html_document:
     toc: true
     toc_float: true
     number_sections: true
     mathjax: default
+  pdf_document: default
 header-includes:
   - \usepackage[utf8]{inputenc}
   - \usepackage[T1]{fontenc}
@@ -135,7 +135,7 @@ Here we create a plot using the `metan` package to observe the distribution of s
 ## Visualization
 
 
-```{r yield-plot1, fig.cap="**Figure 2.** Mean wheat yield (kg ha^{-}¹) for different sowing dates across years and varieties in Dinajpur, Bangladesh. The bars represent the mean yield, while the error bars indicate the standard deviation of the mean. The figure highlights the effect of sowing date and variety on yield performance over multiple growing seasons."}
+```{r yield-plot1, fig.cap="Mean wheat yield (kg ha^{-}¹) for different sowing dates across years and varieties in Dinajpur, Bangladesh. The bars represent the mean yield, while the error bars indicate the standard deviation of the mean. The figure highlights the effect of sowing date and variety on yield performance over multiple growing seasons."}
 
 # Filter the data based on the conditions. 
 
@@ -165,7 +165,7 @@ ggsave("yieldDinajpur.png", width = 20, height = 20, units = "cm")
 
 ```
 
-```{r merging observed and simulated data}
+```{r merging observed and simulated data, echo=FALSE}
 
 ## Load simulation outputs utilizing the NWheat model within the DSSAT-CSM
 dt_sim <- read.csv(file=paste0(work_dir,"/data/DSSAT_simulation_summary.csv"), header = T)
@@ -211,7 +211,7 @@ merged_df$HIAM <- merged_df$HIAM * 100
 
 
 
-```{r Functions to calculate metrics}
+```{r Functions to calculate metrics, echo=FALSE}
 
 # Function to calculate RMSE, D-stat, and NSE
 calculate_metrics <- function(observed, simulated) {
@@ -277,7 +277,7 @@ biomass_metrics <- bind_rows(biomass_metrics)
 ```
 
 
-```{r plots_calibration_evaluation}
+```{r plots_calibration_evaluation, echo=FALSE}
 
 # Plot with metrics for each variable
 plot_with_metrics <- function(data, x_col, y_col, x_label, y_label, x_limits, y_limits, metrics) {
@@ -295,32 +295,45 @@ plot_with_metrics <- function(data, x_col, y_col, x_label, y_label, x_limits, y_
               inherit.aes = FALSE, hjust = 0, color = "black")
 }
 
+```
+
+```{r yield-plot, fig.cap="Identity plot comparing simulated grain yield (kg ha^{-}¹) against measured values."}
 # Yield plot
 c1 <- plot_with_metrics(merged_df, "HWAMM", "HWAM", 
                         "Observed Yield", "Simulated Yield", c(800, 7000), c(800, 7000), yield_metrics)
+c1
+```
+
+```{r Anthesis-plot, fig.cap="Identity plot comparing simulated anthesis dates against measured values."}
 
 # Anthesis plot
 c2 <- plot_with_metrics(merged_df, "ADAPM", "ADAPS", 
                         "Observed Anthesis Date", "Simulated Anthesis Date", c(40, 120), c(40, 120), anthesis_metrics)
+c2
+```
+```{r Maturity-plot, fig.cap="Identity plot comparing simulated maturity dates against measured values."}
 
 # Maturity plot
 c3 <- plot_with_metrics(merged_df, "MDAPM", "MDAPS", 
                         "Observed Maturity Date", "Simulated Maturity Date", c(80, 170), c(80, 170), maturity_metrics)
+c3
+```
 
+```{r Harvest-plot, fig.cap="Identity plot comparing simulated harvest index against measured values."}
 # Harvest index plot
 c4 <- plot_with_metrics(merged_df, "HIAMM", "HIAM", 
                         "Observed Grain Number", "Simulated Grain Number", c(0, 100), c(0, 100), harvest_index_metrics)
+c4
+```
 
+```{r Biomass-plot, fig.cap="Identity plot comparing simulated biomass against measured values."}
 # Biomass plot
 c5 <- plot_with_metrics(merged_df, "CWAMM", "CWAM", 
                         "Observed Top Biomass", "Simulated Top Biomass", c(6000, 15000), c(6000, 15000), biomass_metrics)
-
-# Display plots
-c1
-c2
-c3
-c4
 c5
+```
+
+```{r save_plots, echo=FALSE}
 
 ggsave("yield.png", c1, width = 20, height = 20, units = "cm")
 ggsave("anthesis.png", c2, width = 20, height = 20, units = "cm")
@@ -331,7 +344,7 @@ ggsave("biomass.png", c5, width = 20, height = 20, units = "cm")
 
 ```
 
-```{r yield-plot2, fig.cap="**Figure 2.** Mean wheat yield (kg ha^{-}¹) for different sowing dates across years and varieties in Rajshahi, Bangladesh. The bars represent the mean yield, while the error bars indicate the standard deviation of the mean. The figure highlights the effect of sowing date and variety on yield performance over multiple growing seasons."}
+```{r yield-plot2, fig.cap="Mean wheat yield (kg ha^{-}¹) for different sowing dates across years and varieties in Rajshahi, Bangladesh. The bars represent the mean yield, while the error bars indicate the standard deviation of the mean. The figure highlights the effect of sowing date and variety on yield performance over multiple growing seasons."}
 
 # Create the plot
 # Filter the data based on the conditions. 
