@@ -1,5 +1,5 @@
 ---
-title: "Early sowing enhances genotypic performance in mitigating the risk of wheat blast-induced yield loss: Evidence from a 23-year simulation study in Bangladesh"
+title: "Supplementary Material 1- Calibration and Evaluation of Nwheat Simulation Model"
 date: "`r Sys.Date()`"
 output:
   pdf_document: default
@@ -15,7 +15,7 @@ header-includes:
 
 # Introduction
 
-This document contains the supplementary material for the manuscript titled **"Mitigating the Impact of Wheat Blast on Wheat Production in Bangladesh: A Study on Sowing Dates and Varietal Selection"**. It includes additional analyses, datasets, and code used to generate the results presented in the main text.
+This document contains the supplementary material for the manuscript titled **"Early sowing enhances genotypic performance in mitigating the risk of wheat blast-induced yield loss: Evidence from a 23-year simulation study in Bangladesh"**. It includes additional analyses, datasets, and code used to generate the results presented in the main text.
 
 ```{r,echo=FALSE, message=FALSE, warning=FALSE}
 knitr::opts_chunk$set(
